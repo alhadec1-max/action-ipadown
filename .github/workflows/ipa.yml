@@ -98,6 +98,8 @@ jobs:
         shell: bash
 
       - name: "Upload package"
-        uses: NyaMisty/upload-artifact-as-is@master
+        uses: actions/upload-artifact@v4
         with:
-          path: ipaDown\*
+          name: ipa-package
+          path: ipaDown/
+          if-no-files-found: error
