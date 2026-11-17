@@ -1,13 +1,11 @@
-# vim: expandtab tabstop=2 shiftwidth=2
 name: IPA Down
 
 env:
   PYTHONIOENCODING: utf-8
 
-# Allow Release
 permissions: write-all
 
-on: 
+on:
   workflow_dispatch:
     inputs:
       appleId:
@@ -17,34 +15,22 @@ on:
         description: 'Apple ID Password'
         required: true
       operation:
-        description: 'Operation to do, choices: lookup, historyver, download, historyver_id, download_id'
+        description: 'Operation to do: lookup, historyver, download, historyver_id, download_id'
         required: true
         default: 'download_id'
-      
       appBundleId:
-        description: 'AppStore Bundle-ID (needed when using non-*_id operations)'
+        description: 'AppStore Bundle-ID (for download / lookup)'
         required: false
       appCountry:
-        description: 'AppStore Country (needed when using non-*_id operations)'
+        description: 'AppStore Country'
         required: false
         default: 'JP'
-      
       appVerId:
-        description: 'App Version Id Number (for downloading history versions)'
+        description: 'App Version Id Number (optional)'
         required: false
-
       appId:
-        description: 'App Id Number (needed when using *_id operations)'
+        description: 'App Id Number (for download_id / historyver_id)'
         required: false
-      
-      debug_enabled:
-        description: 'Run the build with RDP debugging enabled'
-        required: false
-        default: false
-      itunes_debug_enabled:
-        description: 'Run the build with ngrok debugging enabled'
-        required: false
-        default: false
 
 jobs:
   download_ipa:
@@ -76,11 +62,10 @@ jobs:
           apple_id: ${{ github.event.inputs.appleId }}
           apple_id_pwd: ${{ github.event.inputs.appleIdPwd }}
           ngrok_token: ${{ secrets.NGROK_AUTH_TOKEN }}
-        
+
       - name: Execute operation
         id: operation
         run: |
-          # available operations: lookup, historyver, download, historyver_id, download_id
           op=${{ github.event.inputs.operation }}
           if [[ "$op" == "lookup" ]]; then
             if [[ "${{ github.event.inputs.appBundleId }}" != "" ]]; then
@@ -90,8 +75,7 @@ jobs:
             fi
           elif [[ "$op" == historyver* ]]; then
             if [[ "$op" == "historyver" ]]; then
-              python3 ipatool-py/main.py --json lookup -b ${{ github.event.inputs.appBundleId }} -c ${{ github.event.inputs.appCountry }} \
-                                                  historyver -s http://127.0.0.1:9000
+              python3 ipatool-py/main.py --json lookup -b ${{ github.event.inputs.appBundleId }} -c ${{ github.event.inputs.appCountry }} historyver -s http://127.0.0.1:9000
             elif [[ "$op" == "historyver_id" ]]; then
               python3 ipatool-py/main.py --json historyver -s http://127.0.0.1:9000 --appId ${{ github.event.inputs.appId }}
             fi
@@ -103,25 +87,17 @@ jobs:
             fi
 
             if [[ "$op" == "download" ]]; then
-              output=$(python3 ipatool-py/main.py --json lookup -b ${{ github.event.inputs.appBundleId }} -c ${{ github.event.inputs.appCountry }} \
-                                                  download -o ipaDown -s http://127.0.0.1:9000 $appVerCmd)
+              output=$(python3 ipatool-py/main.py --json lookup -b ${{ github.event.inputs.appBundleId }} -c ${{ github.event.inputs.appCountry }} download -o ipaDown -s http://127.0.0.1:9000 $appVerCmd)
             elif [[ "$op" == "download_id" ]]; then
               output=$(python3 ipatool-py/main.py --json download -o ipaDown -s http://127.0.0.1:9000 --appId ${{ github.event.inputs.appId }} $appVerCmd)
             fi
             echo "Got Downloading JSON result: $output"
-            echo "needIPARelease=1" >> $GITHUB_OUTPUT
-            echo "appName=$(echo "$output" | jq -r '.appName')" >> $GITHUB_OUTPUT
-            echo "appBundleId=$(echo "$output" | jq -r '.appBundleId')" >> $GITHUB_OUTPUT
-            echo "appVer=$(echo "$output" | jq -r '.appVer')" >> $GITHUB_OUTPUT
-            echo "appId=$(echo "$output" | jq -r '.appId')" >> $GITHUB_OUTPUT
-            echo "appVerId=$(echo "$output" | jq -r '.appVerId')" >> $GITHUB_OUTPUT
           else
             echo "Unknown Operation: $op"
           fi
         shell: bash
-        
+
       - name: "Upload package"
         uses: NyaMisty/upload-artifact-as-is@master
         with:
           path: ipaDown\*
-
